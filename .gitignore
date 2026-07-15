@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+data/mx_cache.json
+data/check_history.json
+.DS_Store

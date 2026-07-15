@@ -1,0 +1,6 @@
+streamlit
+pandas
+dnspython
+requests
+python-dotenv
+openpyxl
