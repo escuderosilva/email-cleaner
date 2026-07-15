@@ -190,7 +190,8 @@ def reconcile_smtp(df, smtp_by_index: dict, strict_unverifiable: bool = False, p
     - existe        -> valido (o riesgo si además es cuenta de rol)
     - no_existe     -> invalido
     - sin_mx        -> invalido
-    - catch_all     -> riesgo
+    - catch_all     -> NO cambia el estado (el SMTP no puede confirmar nada en un
+                       dominio que acepta todo); solo queda en la columna smtp_estado
     - no_verificable -> riesgo (o invalido si strict_unverifiable)
 
     Se muta el DataFrame recibido en el sitio (sin copiar) para ahorrar memoria.
@@ -214,8 +215,8 @@ def reconcile_smtp(df, smtp_by_index: dict, strict_unverifiable: bool = False, p
             df.at[idx, "estado"] = "invalido"
             df.at[idx, "motivo"] = ";".join(motivo + [f"smtp_{se}"])
         elif se == "catch_all":
-            df.at[idx, "estado"] = "riesgo"
-            df.at[idx, "motivo"] = ";".join(motivo + ["smtp_catch_all"])
+            # No se toca el estado: el dominio acepta todo, el SMTP no prueba nada.
+            pass
         elif se == "no_verificable":
             df.at[idx, "estado"] = "invalido" if strict_unverifiable else "riesgo"
             df.at[idx, "motivo"] = ";".join(motivo + ["smtp_no_verificable"])

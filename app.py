@@ -81,21 +81,20 @@ def guess_email_column(columns) -> int:
 
 
 # ---------- Encabezado ----------
-st.title("📧 Limpiador de bases de contactos")
-st.caption("Sube tu lista, límpiala en un clic y descarga los contactos válidos para tus campañas.")
+st.title("Limpiador de bases de contactos")
+st.caption("Sube tu lista, límpiala y descarga los contactos válidos para tus campañas.")
 
-with st.expander("❓ ¿Qué hace esta herramienta y cómo la uso?"):
+with st.expander("¿Qué hace esta herramienta y cómo la uso?"):
     st.markdown(
         """
-        Revisa cada correo de tu lista y te dice si sirve o no para enviar campañas,
-        **reduciendo los rebotes** (correos que no llegan).
+        Revisa cada correo de tu lista y determina si sirve para enviar campañas,
+        reduciendo los rebotes.
 
-        1. **Sube** tu archivo (Excel o CSV).
-        2. Aprieta **Procesar**.
-        3. **Descarga** la lista limpia.
+        1. Sube tu archivo (Excel o CSV).
+        2. Aprieta Procesar.
+        3. Descarga la lista limpia.
 
-        No borra ni modifica tu archivo original: genera uno nuevo, ya limpio.
-        Puedes subir listas nuevas cuantas veces quieras.
+        No modifica tu archivo original: genera uno nuevo, ya limpio.
         """
     )
 
@@ -142,7 +141,7 @@ if uploaded:
                  "Si no sabes, déjalo como está.",
         )
 
-    with st.expander("⚙️ Opciones (ya vienen bien configuradas, tócalas solo si sabes qué hacen)"):
+    with st.expander("Opciones (vienen configuradas por defecto)"):
         autocorrect = st.checkbox(
             "Corregir errores de tipeo en dominios", value=True,
             help="Arregla cosas como 'gmial.com' → 'gmail.com'. Nunca toca dominios que sí funcionan.",
@@ -162,7 +161,7 @@ if uploaded:
             help="Un correo revisado dentro de esta ventana no se vuelve a chequear.",
         )
 
-    if st.button("✨ Procesar lista", type="primary", use_container_width=True):
+    if st.button("Procesar lista", type="primary", use_container_width=True):
         progress = st.progress(0.0, text="Revisando dominios...")
 
         def on_progress(done, total):
@@ -195,35 +194,35 @@ if "result" in st.session_state:
     counts = result["estado"].value_counts()
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Total", f"{len(result):,}", help="Filas en tu archivo.")
-    m2.metric("✅ Válidos", f"{counts.get('valido', 0):,}", help="Listos para enviar.")
-    m3.metric("⚠️ Riesgo", f"{counts.get('riesgo', 0):,}", help="Se pueden enviar con criterio.")
-    m4.metric("❌ Inválidos", f"{counts.get('invalido', 0):,}", help="No enviar: rebotarían.")
-    m5.metric("🔁 Repetidos", f"{int(result['es_duplicado'].sum()):,}", help="Correos duplicados.")
+    m2.metric("Válidos", f"{counts.get('valido', 0):,}", help="Listos para enviar.")
+    m3.metric("Riesgo", f"{counts.get('riesgo', 0):,}", help="Se pueden enviar con criterio.")
+    m4.metric("Inválidos", f"{counts.get('invalido', 0):,}", help="No enviar: rebotarían.")
+    m5.metric("Repetidos", f"{int(result['es_duplicado'].sum()):,}", help="Correos duplicados.")
 
     corregidos = int((result["correccion_typo"] != "").sum())
     reusados = int(result["reutilizado"].sum())
     notas = []
     if corregidos:
-        notas.append(f"✏️ {corregidos:,} dominios con typos corregidos")
+        notas.append(f"{corregidos:,} dominios con typos corregidos")
     if reusados:
-        notas.append(f"♻️ {reusados:,} reutilizados del historial")
+        notas.append(f"{reusados:,} reutilizados del historial")
     if notas:
         st.caption(" · ".join(notas))
 
-    with st.expander("❓ ¿Qué significan válido, riesgo e inválido?"):
+    with st.expander("¿Qué significan válido, riesgo e inválido?"):
         st.markdown(
             """
-            - **✅ Válido** — el correo está bien escrito y su dominio puede recibir mensajes. Envía tranquilo.
-            - **⚠️ Riesgo** — sirve, pero tiene alguna señal a considerar (ej. es una cuenta genérica
-              como `info@`, o no se pudo confirmar del todo). Envía con criterio.
-            - **❌ Inválido** — no conviene enviar: está vacío, mal escrito, el dominio no recibe correo
-              o es un correo desechable. Rebotaría.
+            - **Válido** — bien escrito y su dominio puede recibir mensajes. Se puede enviar.
+            - **Riesgo** — sirve, pero tiene alguna señal a considerar (ej. es una cuenta
+              genérica como `info@`, o no se pudo confirmar del todo). Enviar con criterio.
+            - **Inválido** — no conviene enviar: está vacío, mal escrito, el dominio no
+              recibe correo o es un correo desechable. Rebotaría.
 
             La columna **motivo** explica el porqué de cada caso.
             """
         )
 
-    with st.expander("📊 Ver desglose por motivo y tipo de dominio"):
+    with st.expander("Ver desglose por motivo y tipo de dominio"):
         cols = st.columns(2)
         with cols[0]:
             st.markdown("**Motivos**")
@@ -237,7 +236,7 @@ if "result" in st.session_state:
             st.dataframe(result["tipo_dominio"].value_counts().rename("cantidad"), use_container_width=True)
 
     # ---- Filtros ----
-    st.markdown("##### 🔎 Explorar la tabla")
+    st.markdown("##### Explorar la tabla")
     f1, f2 = st.columns(2)
     filtro = f1.multiselect(
         "Mostrar estados", ["valido", "riesgo", "invalido"],
@@ -290,7 +289,7 @@ if "result" in st.session_state:
     st.caption(f"Se descargarán {len(df_desc):,} filas.")
     if fmt.startswith("CSV"):
         st.download_button(
-            "⬇️ Descargar", df_desc.to_csv(index=False).encode("utf-8"),
+            "Descargar", df_desc.to_csv(index=False).encode("utf-8"),
             file_name=f"{nombre}_limpio.csv", mime="text/csv",
             type="primary", use_container_width=True,
         )
@@ -301,14 +300,14 @@ if "result" in st.session_state:
                 "pone lenta o se corta, usa **CSV** (Excel lo abre igual)."
             )
         st.download_button(
-            "⬇️ Descargar", to_excel_bytes(df_desc),
+            "Descargar", to_excel_bytes(df_desc),
             file_name=f"{nombre}_limpio.xlsx", mime=EXCEL_MIME,
             type="primary", use_container_width=True,
         )
 
     # ---- Verificación SMTP (avanzado) ----
     st.divider()
-    with st.expander("🔌 Verificación avanzada (SMTP) — opcional, para usuarios avanzados"):
+    with st.expander("Verificación avanzada (SMTP) — opcional, para usuarios avanzados"):
         st.markdown(
             "Hace un chequeo más profundo conectándose al servidor de cada correo "
             "(sin enviar nada) y **actualiza el estado de la base** con lo que encuentre."
@@ -362,7 +361,7 @@ if "result" in st.session_state:
                 st.rerun()
 
     # ---- HubSpot (opcional) ----
-    with st.expander("🟠 Actualizar HubSpot con estos resultados — opcional"):
+    with st.expander("Actualizar HubSpot con estos resultados — opcional"):
         st.markdown(
             "Por defecto la herramienta **no toca HubSpot**. Actívalo solo si quieres "
             "reflejar esta limpieza en tu CRM. Corre siempre la simulación primero."
