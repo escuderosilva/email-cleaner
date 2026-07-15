@@ -7,3 +7,7 @@ gatherUsageStats = false
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# Límite de subida (MB). Evita archivos gigantes que disparan la memoria.
+maxUploadSize = 50

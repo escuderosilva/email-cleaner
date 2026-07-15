@@ -34,8 +34,10 @@ def clean_dataframe(
     progress_callback=None,
 ) -> pd.DataFrame:
     """Limpia la base. Si recheck_days está seteado, reutiliza del historial los
-    correos chequeados dentro de esa ventana (no los revalida)."""
-    df = df.copy()
+    correos chequeados dentro de esa ventana (no los revalida).
+
+    Nota: se opera sobre el `df` recibido sin copiarlo, para ahorrar memoria; la
+    app entrega un DataFrame recién leído en cada corrida, así que es seguro."""
     emails = df[email_col].fillna("").astype(str).str.strip().str.lower()
 
     now = datetime.now()
@@ -190,8 +192,9 @@ def reconcile_smtp(df, smtp_by_index: dict, strict_unverifiable: bool = False, p
     - sin_mx        -> invalido
     - catch_all     -> riesgo
     - no_verificable -> riesgo (o invalido si strict_unverifiable)
+
+    Se muta el DataFrame recibido en el sitio (sin copiar) para ahorrar memoria.
     """
-    df = df.copy()
     if "smtp_estado" not in df.columns:
         df["smtp_estado"] = ""
         df["smtp_detalle"] = ""
@@ -248,11 +251,13 @@ def _mark_duplicates(df: pd.DataFrame, activity_col: str) -> pd.DataFrame:
     """Marca como duplicado todo registro con email repetido, conservando el de
     actividad más reciente (o el primero si no hay columna de fecha)."""
     has_email = df["email_normalizado"] != ""
-    subset = df[has_email].copy()
-
     if activity_col and activity_col in df.columns:
-        subset["_activity"] = pd.to_datetime(subset[activity_col], errors="coerce")
+        # Solo las columnas necesarias para ordenar, no una copia de todo el df.
+        subset = df.loc[has_email, ["email_normalizado"]].copy()
+        subset["_activity"] = pd.to_datetime(df.loc[has_email, activity_col], errors="coerce")
         subset = subset.sort_values("_activity", ascending=False, na_position="last")
+    else:
+        subset = df.loc[has_email, ["email_normalizado"]]
     dup_mask = subset.duplicated(subset="email_normalizado", keep="first")
     duplicate_index = subset.index[dup_mask]
     df.loc[duplicate_index, "es_duplicado"] = True

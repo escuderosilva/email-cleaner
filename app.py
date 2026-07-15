@@ -48,9 +48,21 @@ EXCEL_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
 def to_excel_bytes(df: pd.DataFrame) -> bytes:
+    """Escribe el Excel en modo streaming (write_only) para usar poca RAM:
+    no mantiene todos los objetos-celda en memoria como haría pandas.to_excel."""
+    from openpyxl import Workbook
+
+    wb = Workbook(write_only=True)
+    ws = wb.create_sheet("contactos")
+    ws.append([str(c) for c in df.columns])
+    for row in df.itertuples(index=False, name=None):
+        ws.append([
+            "" if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
+            for v in row
+        ])
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="contactos")
+    wb.save(buf)
+    wb.close()
     return buf.getvalue()
 
 
@@ -255,30 +267,42 @@ if "result" in st.session_state:
     st.markdown('<div class="paso">Paso 3</div>', unsafe_allow_html=True)
     st.subheader("Descarga tu lista limpia")
 
-    opciones_desc = {
-        "Solo válidos y sin repetidos (recomendado para enviar)":
-            result[(result["estado"] == "valido") & (~result["es_duplicado"])],
-        "Enviables (válidos + riesgo, sin repetidos)":
-            result[(result["estado"].isin(["valido", "riesgo"])) & (~result["es_duplicado"])],
-        "Lo que estoy viendo en la tabla (con filtros)": view,
-        "Todo (base completa con estado y motivo)": result,
-    }
+    opciones = [
+        "Solo válidos y sin repetidos (recomendado para enviar)",
+        "Enviables (válidos + riesgo, sin repetidos)",
+        "Lo que estoy viendo en la tabla (con filtros)",
+        "Todo (base completa con estado y motivo)",
+    ]
     dcol1, dcol2 = st.columns([2, 1])
-    sel = dcol1.selectbox("¿Qué quieres descargar?", list(opciones_desc.keys()))
-    fmt = dcol2.radio("Formato", ["Excel (.xlsx)", "CSV"], horizontal=False)
+    sel = dcol1.selectbox("¿Qué quieres descargar?", opciones)
+    fmt = dcol2.radio("Formato", ["CSV (más liviano)", "Excel (.xlsx)"], horizontal=False)
 
-    df_desc = opciones_desc[sel]
-    st.caption(f"Se descargarán {len(df_desc):,} filas.")
-    if fmt.startswith("Excel"):
-        st.download_button(
-            "⬇️ Descargar", to_excel_bytes(df_desc),
-            file_name=f"{nombre}_limpio.xlsx", mime=EXCEL_MIME,
-            type="primary", use_container_width=True,
-        )
+    # Se construye SOLO el subconjunto elegido, para no tener 4 copias en memoria.
+    if sel.startswith("Solo válidos"):
+        df_desc = result[(result["estado"] == "valido") & (~result["es_duplicado"])]
+    elif sel.startswith("Enviables"):
+        df_desc = result[(result["estado"].isin(["valido", "riesgo"])) & (~result["es_duplicado"])]
+    elif sel.startswith("Lo que estoy"):
+        df_desc = view
     else:
+        df_desc = result
+
+    st.caption(f"Se descargarán {len(df_desc):,} filas.")
+    if fmt.startswith("CSV"):
         st.download_button(
             "⬇️ Descargar", df_desc.to_csv(index=False).encode("utf-8"),
             file_name=f"{nombre}_limpio.csv", mime="text/csv",
+            type="primary", use_container_width=True,
+        )
+    else:
+        if len(df_desc) > 40000:
+            st.warning(
+                "Exportar tantas filas a Excel usa bastante memoria. Si la app se "
+                "pone lenta o se corta, usa **CSV** (Excel lo abre igual)."
+            )
+        st.download_button(
+            "⬇️ Descargar", to_excel_bytes(df_desc),
+            file_name=f"{nombre}_limpio.xlsx", mime=EXCEL_MIME,
             type="primary", use_container_width=True,
         )
 
