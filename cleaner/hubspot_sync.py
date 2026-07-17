@@ -34,8 +34,12 @@ PROPERTY_DEFS = {
     PROPERTY_OWNER: {
         "name": PROPERTY_OWNER,
         "label": "Validado por",
-        "type": "string",
-        "fieldType": "text",
+        # Propiedad que referencia a un usuario/owner de HubSpot: el valor es el
+        # owner id, así queda asociada al perfil de la persona, no como texto.
+        "type": "enumeration",
+        "fieldType": "select",
+        "referencedObjectType": "OWNER",
+        "externalOptions": True,
         "groupName": "contactinformation",
     },
     PROPERTY_DATE: {
@@ -60,7 +64,11 @@ def get_token(token: str = None) -> str:
 
 
 def ensure_properties(token: str = None) -> dict:
-    """Crea las propiedades custom que falten. Idempotente."""
+    """Crea las propiedades custom que falten. Idempotente.
+
+    Si la propiedad 'Validado por' quedó de una versión anterior como texto, la
+    recrea como referencia a owner (migración; solo tiene sentido porque aún no
+    guarda datos)."""
     token = get_token(token)
     created = []
     for name, payload in PROPERTY_DEFS.items():
@@ -68,7 +76,15 @@ def ensure_properties(token: str = None) -> dict:
             f"{BASE}/crm/v3/properties/contacts/{name}", headers=_headers(token), timeout=20
         )
         if r.status_code == 200:
-            continue
+            existing = r.json()
+            wanted_ref = payload.get("referencedObjectType")
+            if wanted_ref and existing.get("referencedObjectType") != wanted_ref:
+                # Tipo distinto al deseado: borrar y recrear.
+                requests.delete(
+                    f"{BASE}/crm/v3/properties/contacts/{name}", headers=_headers(token), timeout=20
+                )
+            else:
+                continue
         rc = requests.post(
             f"{BASE}/crm/v3/properties/contacts",
             headers=_headers(token), json=payload, timeout=20,
@@ -83,10 +99,31 @@ def ensure_property(token: str = None) -> dict:
     return ensure_properties(token)
 
 
-def build_inputs(df, owner: str = None, email_col: str = "email_normalizado",
+def resolve_owner_id(email: str, token: str = None):
+    """Traduce un correo al owner id de HubSpot (perfil de usuario).
+    Requiere el scope crm.objects.owners.read en la Service Key."""
+    token = get_token(token)
+    r = requests.get(
+        f"{BASE}/crm/v3/owners", headers=_headers(token),
+        params={"email": email}, timeout=20,
+    )
+    if r.status_code == 403:
+        raise ValueError(
+            "La Service Key no tiene el scope 'crm.objects.owners.read'. "
+            "Agrégalo en HubSpot para poder asociar el validador a su perfil."
+        )
+    r.raise_for_status()
+    results = r.json().get("results", [])
+    for o in results:
+        if o.get("email", "").lower() == email.lower():
+            return o.get("id")
+    return results[0].get("id") if results else None
+
+
+def build_inputs(df, owner_id: str = None, email_col: str = "email_normalizado",
                  status_col: str = "estado") -> list:
     """Construye el payload de batch update. Solo filas con email y no duplicadas.
-    Escribe estado, fecha de verificación y (si se pasa) el correo del validador."""
+    Escribe estado, fecha de verificación y (si se pasa) el owner id del validador."""
     inputs = []
     for _, row in df.iterrows():
         email = str(row.get(email_col, "")).strip()
@@ -96,8 +133,8 @@ def build_inputs(df, owner: str = None, email_col: str = "email_normalizado",
         fecha = str(row.get("last_check_date", "")).strip()
         if fecha:
             props[PROPERTY_DATE] = fecha
-        if owner:
-            props[PROPERTY_OWNER] = owner
+        if owner_id:
+            props[PROPERTY_OWNER] = owner_id
         inputs.append({"idProperty": "email", "id": email, "properties": props})
     return inputs
 
@@ -171,12 +208,24 @@ def archive_invalids(df, token: str = None, dry_run: bool = True, batch_size: in
 def sync_statuses(df, token: str = None, owner: str = None,
                   dry_run: bool = True, batch_size: int = 100) -> dict:
     """Escribe estado, fecha de verificación y validador por contacto.
-    dry_run=True no llama a HubSpot."""
-    inputs = build_inputs(df, owner=owner)
+    El validador (owner) se resuelve a su owner id de HubSpot para quedar asociado
+    a su perfil. dry_run=True no escribe, pero sí resuelve el owner para validarlo."""
+    owner_id = None
+    validado_por = "(sin owner)"
+    if owner:
+        token = get_token(token)
+        owner_id = resolve_owner_id(owner, token)
+        if not owner_id:
+            raise ValueError(
+                f"'{owner}' no es un usuario de HubSpot; no se puede asociar como validador."
+            )
+        validado_por = f"{owner} (owner id {owner_id})"
+
+    inputs = build_inputs(df, owner_id=owner_id)
     summary = {
         "total_a_actualizar": len(inputs),
         "dry_run": dry_run,
-        "validado_por": owner or "(sin owner)",
+        "validado_por": validado_por,
         "muestra": inputs[:5],
         "lotes": (len(inputs) + batch_size - 1) // batch_size,
         "actualizados": 0,
