@@ -1,0 +1,123 @@
+\documentclass[10pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=1.7cm]{geometry}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{parskip}
+
+\definecolor{azul}{HTML}{2F5FB3}
+\definecolor{gris}{HTML}{555555}
+
+\titleformat{\section}{\large\bfseries\color{azul}}{}{0pt}{}
+\titlespacing*{\section}{0pt}{8pt}{2pt}
+\setlist{nosep,leftmargin=1.4em}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+    {\LARGE\bfseries\color{azul} Limpiador de bases de contactos}\\[2pt]
+    {\small\color{gris} Guía rápida de uso}
+\end{center}
+
+\vspace{2pt}
+
+\noindent Esta herramienta revisa una lista de correos y determina cuáles sirven para
+enviar campañas, reduciendo los rebotes (correos que no llegan). Acepta archivos
+\textbf{Excel} y \textbf{CSV}, y no modifica tu archivo original: genera uno nuevo, ya limpio.
+
+\section{El flujo completo}
+\begin{center}
+    \textbf{Subir correos} $\rightarrow$ \textbf{Analizar / limpiar} $\rightarrow$
+    \textbf{Chequeo SMTP} (opcional) $\rightarrow$ \textbf{Cargar en HubSpot} (opcional)
+\end{center}
+\noindent Subes tu lista, la herramienta la analiza y clasifica, opcionalmente haces un
+chequeo más profundo (SMTP), y opcionalmente marcas el resultado en HubSpot. Solo el
+primer paso es obligatorio; los demás, cuando los necesites.
+
+\section{Qué puede y qué no puede hacer}
+\textbf{Sí puede:} validar que el correo esté bien escrito, que su dominio pueda recibir
+mensajes (registro MX), detectar dominios desechables, cuentas genéricas (\texttt{info@}),
+corregir errores de tipeo y marcar duplicados. Con el chequeo SMTP, además intenta
+confirmar el buzón contra el servidor de destino.
+
+\textbf{No puede:} saber si una cuenta está \emph{activa} o es ``zombi'', ni detectar
+trampas de spam, ni confirmar buzones en dominios que aceptan todo (catch-all). Para ese
+nivel de certeza existe software especializado de pago como \textbf{ZeroBounce}. Esta
+herramienta cubre bien la mayoría de los rebotes evitables, gratis y con tus propios datos.
+
+\section{Cómo usarla (3 pasos)}
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Sube tu lista.} Arrastra el archivo Excel o CSV. La herramienta detecta
+    sola la columna de correos; cámbiala si eligió mal. Aprieta \textbf{Procesar lista}.
+    \item \textbf{Revisa el resultado.} Verás cuántos correos son válidos, de riesgo o
+    inválidos. Puedes filtrar la tabla por estado o por tipo de error.
+    \item \textbf{Descarga la lista limpia.} Elige qué bajar (solo válidos, enviables, o
+    todo) y en qué formato (CSV o Excel).
+\end{enumerate}
+
+\section{Qué significa cada estado}
+\begin{itemize}
+    \item \textbf{Válido.} Está bien escrito y su dominio puede recibir correo. Se puede enviar.
+    \item \textbf{Riesgo.} Sirve, pero tiene alguna señal a considerar (por ejemplo, es una
+    cuenta genérica como \texttt{info@} o \texttt{ventas@}). Enviar con criterio.
+    \item \textbf{Inválido.} No conviene enviar: está vacío, mal escrito, el dominio no recibe
+    correo o es desechable. Rebotaría.
+\end{itemize}
+
+\section{Motivos más frecuentes}
+\begin{itemize}
+    \item \texttt{sin\_email} --- la fila no traía correo.
+    \item \texttt{sintaxis\_invalida} --- el correo está mal escrito.
+    \item \texttt{dominio\_sin\_mx} --- el dominio no puede recibir correo (rebota siempre).
+    \item \texttt{cuenta\_generica\_rol} --- es una casilla de área (\texttt{info@},
+    \texttt{soporte@}), no una persona.
+    \item \texttt{dominio\_desechable} --- correo temporal o de un solo uso.
+\end{itemize}
+
+\section{Columnas útiles del resultado}
+\begin{itemize}
+    \item \textbf{estado} y \textbf{motivo} --- el veredicto y su porqué.
+    \item \textbf{tipo\_dominio} --- personal (gmail, hotmail) o corporativo.
+    \item \textbf{correccion\_typo} --- si se corrigió un error de tipeo (ej. \texttt{gmial.com}
+    $\rightarrow$ \texttt{gmail.com}).
+    \item \textbf{last\_check\_date} --- cuándo se verificó ese correo.
+    \item \textbf{es\_duplicado} --- si el correo está repetido en la lista.
+\end{itemize}
+
+\section{Verificación avanzada (SMTP, opcional)}
+Es un chequeo más profundo: se conecta al servidor de cada correo (sin enviar nada) para
+confirmar mejor si el buzón recibe. Al terminar, \textbf{actualiza el estado de la base}.
+Verifica los correos que tengas visibles en la tabla, según tus filtros.
+\begin{itemize}
+    \item \textbf{Existe} $\rightarrow$ válido. \quad \textbf{No existe / sin MX}
+    $\rightarrow$ inválido.
+    \item \textbf{Catch-all} (el dominio acepta todo) $\rightarrow$ no cambia el estado: el
+    servidor no permite confirmar el buzón.
+    \item \textbf{No verificable} (el servidor no responde con certeza) $\rightarrow$ riesgo.
+\end{itemize}
+\textbf{Ojo:} necesita un correo remitente dedicado (no el corporativo principal) y una red
+que no bloquee el puerto 25 --- desde oficinas o casas suele salir ``no verificable'', y eso
+es la red, no un error. Está pensado para lotes chicos (máximo 3.000 correos).
+
+\section{Integración con HubSpot (opcional)}
+Por defecto no toca HubSpot. Si lo activas, \textbf{marca el estado en cada contacto} (no
+borra ni archiva nada). Buscando por correo, escribe tres propiedades:
+\begin{itemize}
+    \item \textbf{Estado validación email} --- válido / riesgo / inválido.
+    \item \textbf{Validado por} --- tu usuario de HubSpot, para que quede quién hizo el chequeo.
+    \item \textbf{Última verificación email} --- la fecha.
+\end{itemize}
+Corre siempre primero en \textbf{Modo simulación} (muestra a cuántos afectaría sin tocar el
+CRM). Solo actualiza contactos que ya existen; no crea nuevos.
+
+\section{Consejos}
+\begin{itemize}
+    \item Para enviar campañas, usa la descarga \textbf{``Solo válidos y sin repetidos''}.
+    \item Un correo de riesgo por ser cuenta genérica igual llega; decide según tu campaña.
+    \item Las verificaciones se recuerdan: un correo revisado hace poco no se vuelve a chequear.
+\end{itemize}
+
+\end{document}

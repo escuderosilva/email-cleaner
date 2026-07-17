@@ -364,45 +364,32 @@ if "result" in st.session_state:
     with st.expander("Actualizar HubSpot con estos resultados — opcional"):
         st.markdown(
             "Por defecto la herramienta **no toca HubSpot**. Actívalo solo si quieres "
-            "reflejar esta limpieza en tu CRM. Corre siempre la simulación primero."
+            "reflejar esta limpieza en tu CRM **marcando el estado** en cada contacto. "
+            "No borra ni archiva contactos. Corre siempre la simulación primero."
         )
-        usar_hs = st.checkbox("Sí, quiero actuar sobre HubSpot", value=False)
+        usar_hs = st.checkbox("Sí, quiero marcar el estado en HubSpot", value=False)
         if usar_hs:
-            accion = st.radio(
-                "¿Qué hacer?",
-                [
-                    "Marcar el estado en cada contacto (no borra nada)",
-                    "Archivar los inválidos (van a la papelera, recuperables ~90 días)",
-                ],
+            owner_email = st.text_input(
+                "Tu correo (queda registrado como quién validó)",
+                placeholder="tunombre@wherex.com",
+                help="Se asocia a tu perfil de HubSpot en la propiedad 'Validado por', "
+                     "junto con la fecha de la verificación.",
             )
-            es_marcar = accion.startswith("Marcar")
-            owner_email = ""
-            if es_marcar:
-                owner_email = st.text_input(
-                    "Tu correo (queda registrado como quién validó)",
-                    placeholder="tunombre@wherex.com",
-                    help="Se guarda en la propiedad 'Validado por' de cada contacto, junto "
-                         "con la fecha de la verificación.",
-                )
             dry = st.checkbox(
                 "Modo simulación (no toca el CRM)", value=True,
                 help="Te muestra a cuántos afectaría, sin cambiar nada. Desmárcalo para ejecutar de verdad.",
             )
-            if st.button("Ejecutar en HubSpot"):
-                if es_marcar and (not owner_email or "@" not in owner_email):
+            if st.button("Marcar estado en HubSpot"):
+                if not owner_email or "@" not in owner_email:
                     st.error("Ingresa tu correo para registrar quién hizo la validación.")
                 else:
                     try:
-                        if es_marcar:
-                            from cleaner.hubspot_sync import sync_statuses
-                            summary = sync_statuses(result, owner=owner_email.strip(), dry_run=dry)
-                        else:
-                            from cleaner.hubspot_sync import archive_invalids
-                            summary = archive_invalids(result, dry_run=dry)
+                        from cleaner.hubspot_sync import sync_statuses
+                        summary = sync_statuses(result, owner=owner_email.strip(), dry_run=dry)
                         st.json(summary)
                         if dry:
                             st.success("Simulación lista. Revisa el resumen y desmarca 'Modo simulación' para ejecutar.")
                         else:
-                            st.success("Ejecutado en HubSpot.")
+                            st.success("Estados marcados en HubSpot.")
                     except Exception as e:
                         st.error(f"Error: {e}")
