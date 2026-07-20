@@ -5,4 +5,5 @@ __pycache__/
 .streamlit/secrets.toml
 data/mx_cache.json
 data/check_history.json
+data/usage_log.csv
 .DS_Store

@@ -50,6 +50,22 @@ HUBSPOT_TOKEN=tu-service-key
 
 ---
 
+## Acceso y trazabilidad
+
+Al abrir la app se pide un correo corporativo (`@wherex.com` / `@wherexpay.com`)
+antes de dejar usarla. Cada acción relevante (login, procesar, SMTP, HubSpot)
+se registra con el correo y la fecha:
+
+- A **stdout** → queda en los logs de Streamlit Cloud (Manage app → logs). Esta es
+  la fuente durable de tracking en el hosting.
+- A `data/usage_log.csv` → persistente en local, **efímero en Streamlit Cloud**
+  (se pierde al reiniciar el contenedor).
+
+Este login es liviano y sirve para **trazar el uso**, no como seguridad fuerte
+(alguien podría escribir cualquier correo del dominio). Para identidad real y no
+falsificable, marca la app como privada en Streamlit Cloud y usa su login de
+Google (SSO); se puede leer el correo autenticado con `st.user`.
+
 ## Subir a GitHub
 
 Ya viene inicializado como repo git con un commit inicial. Para publicarlo:

@@ -19,6 +19,7 @@ except Exception:
     pass
 
 from cleaner.pipeline import clean_dataframe
+from cleaner.usage import ALLOWED_DOMAINS, is_allowed_email, log_event
 
 st.set_page_config(page_title="Limpiador de bases de contactos", page_icon="📧", layout="wide")
 
@@ -79,6 +80,31 @@ def guess_email_column(columns) -> int:
             return i
     return 0
 
+
+# ---------- Acceso (login por correo corporativo, para trazar el uso) ----------
+if "user_email" not in st.session_state:
+    st.title("Limpiador de bases de contactos")
+    st.markdown("Ingresa tu correo corporativo para usar la herramienta.")
+    with st.form("login"):
+        correo = st.text_input("Correo", placeholder="tunombre@wherex.com")
+        entrar = st.form_submit_button("Entrar")
+    if entrar:
+        if is_allowed_email(correo):
+            st.session_state["user_email"] = correo.strip().lower()
+            log_event(st.session_state["user_email"], "login")
+            st.rerun()
+        else:
+            dominios = " o ".join("@" + d for d in sorted(ALLOWED_DOMAINS))
+            st.error(f"Debes ingresar un correo corporativo ({dominios}).")
+    st.stop()
+
+usuario = st.session_state["user_email"]
+
+with st.sidebar:
+    st.markdown(f"**Sesión**\n\n{usuario}")
+    if st.button("Salir"):
+        del st.session_state["user_email"]
+        st.rerun()
 
 # ---------- Encabezado ----------
 st.title("Limpiador de bases de contactos")
@@ -181,6 +207,7 @@ if uploaded:
         progress.empty()
         st.session_state["result"] = result
         st.session_state["nombre_base"] = Path(uploaded.name).stem
+        log_event(usuario, "procesar", f"{len(df):,} filas · {uploaded.name}")
 
 # ---------- Paso 2: resultados ----------
 if "result" in st.session_state:
@@ -357,6 +384,7 @@ if "result" in st.session_state:
                 st.session_state["result"] = reconcile_smtp(
                     result, smtp_by_index, strict_unverifiable=estricto
                 )
+                log_event(usuario, "smtp", f"{len(res):,} correos")
                 st.success(f"Listo. Se actualizaron {len(res):,} correos en la base.")
                 st.rerun()
 
@@ -371,7 +399,7 @@ if "result" in st.session_state:
         if usar_hs:
             owner_email = st.text_input(
                 "Tu correo (queda registrado como quién validó)",
-                placeholder="tunombre@wherex.com",
+                value=usuario,
                 help="Se asocia a tu perfil de HubSpot en la propiedad 'Validado por', "
                      "junto con la fecha de la verificación.",
             )
@@ -387,6 +415,8 @@ if "result" in st.session_state:
                         from cleaner.hubspot_sync import sync_statuses
                         summary = sync_statuses(result, owner=owner_email.strip(), dry_run=dry)
                         st.json(summary)
+                        log_event(usuario, "hubspot",
+                                  f"dry_run={dry} · {summary['total_a_actualizar']} contactos")
                         if dry:
                             st.success("Simulación lista. Revisa el resumen y desmarca 'Modo simulación' para ejecutar.")
                         else:
