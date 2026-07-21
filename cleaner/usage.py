@@ -53,7 +53,9 @@ def _get_worksheet():
             info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
         )
         ws = gspread.authorize(creds).open_by_key(sheet_id).sheet1
-        if not ws.get_all_values():
+        # Encabezado solo si la primera fila está vacía (row_values es confiable
+        # para esto; get_all_values da falsos positivos en hojas recién creadas).
+        if not ws.row_values(1):
             ws.append_row(HEADER)
         _ws = ws
     except Exception:
