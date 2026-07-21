@@ -66,6 +66,21 @@ Este login es liviano y sirve para **trazar el uso**, no como seguridad fuerte
 falsificable, marca la app como privada en Streamlit Cloud y usa su login de
 Google (SSO); se puede leer el correo autenticado con `st.user`.
 
+### Registro durable en Google Sheet (opcional)
+
+Para que el uso quede en un registro histórico consultable (en vez de logs
+efímeros), la herramienta puede escribir cada evento en una Google Sheet:
+
+1. En Google Cloud, crea un **service account**, habilita la **Google Sheets API**
+   y descarga su clave JSON.
+2. Crea una Google Sheet y **compártela como Editor** con el correo del service
+   account (algo como `...@....iam.gserviceaccount.com`).
+3. Configura dos secretos (en `.env` local o en los Secrets de Streamlit Cloud):
+   - `USAGE_SHEET_ID`: el ID de la hoja (lo que va entre `/d/` y `/edit` en la URL).
+   - `GCP_SERVICE_ACCOUNT_JSON`: el JSON del service account (en una sola línea).
+
+Si no se configura, no pasa nada: el log sigue yendo a stdout y al CSV local.
+
 ## Subir a GitHub
 
 Ya viene inicializado como repo git con un commit inicial. Para publicarlo:

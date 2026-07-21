@@ -11,10 +11,15 @@ from dotenv import load_dotenv
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
-# En local la key viene del .env; en Streamlit Cloud viene de los Secrets del panel.
+# En local las claves vienen del .env; en Streamlit Cloud, de los Secrets del panel.
 try:
-    if not os.environ.get("HUBSPOT_TOKEN") and "HUBSPOT_TOKEN" in st.secrets:
-        os.environ["HUBSPOT_TOKEN"] = st.secrets["HUBSPOT_TOKEN"]
+    import json as _json
+    for _k in ("HUBSPOT_TOKEN", "USAGE_SHEET_ID", "GCP_SERVICE_ACCOUNT_JSON"):
+        if os.environ.get(_k) or _k not in st.secrets:
+            continue
+        _v = st.secrets[_k]
+        # El service account puede venir como string JSON o como sección TOML.
+        os.environ[_k] = _v if isinstance(_v, str) else _json.dumps(dict(_v))
 except Exception:
     pass
 

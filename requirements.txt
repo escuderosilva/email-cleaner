@@ -4,3 +4,5 @@ dnspython
 requests
 python-dotenv
 openpyxl
+gspread
+google-auth
