@@ -139,15 +139,41 @@ def build_inputs(df, owner_id: str = None, email_col: str = "email_normalizado",
     return inputs
 
 
+def existing_emails(emails, token: str, batch_size: int = 100) -> set:
+    """Devuelve el subconjunto de correos que YA existen como contacto en HubSpot.
+    Es de solo lectura; los que no existen simplemente no vienen en los resultados."""
+    found = set()
+    url = f"{BASE}/crm/v3/objects/contacts/batch/read"
+    for i in range(0, len(emails), batch_size):
+        chunk = emails[i:i + batch_size]
+        payload = {
+            "idProperty": "email",
+            "properties": ["email"],
+            "inputs": [{"id": e} for e in chunk],
+        }
+        r = requests.post(url, headers=_headers(token), json=payload, timeout=30)
+        # batch/read devuelve 200 (todos) o 207 (parcial); en ambos hay 'results'.
+        if r.status_code < 300:
+            for res in r.json().get("results", []):
+                em = res.get("properties", {}).get("email", "").lower()
+                if em:
+                    found.add(em)
+    return found
+
+
 def sync_statuses(df, token: str = None, owner: str = None,
                   dry_run: bool = True, batch_size: int = 100) -> dict:
     """Escribe estado, fecha de verificación y validador por contacto.
-    El validador (owner) se resuelve a su owner id de HubSpot para quedar asociado
-    a su perfil. dry_run=True no escribe, pero sí resuelve el owner para validarlo."""
+
+    Solo actualiza contactos que YA existen en HubSpot: los correos que no existen
+    se filtran y se reportan. (HubSpot falla el lote completo si un solo id no
+    existe, así que hay que pre-filtrar.) El validador (owner) se resuelve a su
+    owner id para quedar asociado a su perfil. dry_run=True no escribe."""
+    token = get_token(token)
+
     owner_id = None
     validado_por = "(sin owner)"
     if owner:
-        token = get_token(token)
         owner_id = resolve_owner_id(owner, token)
         if not owner_id:
             raise ValueError(
@@ -156,11 +182,20 @@ def sync_statuses(df, token: str = None, owner: str = None,
         validado_por = f"{owner} (owner id {owner_id})"
 
     inputs = build_inputs(df, owner_id=owner_id)
+    candidatos = [i["id"] for i in inputs]
+
+    # Filtrar a los que existen en HubSpot (evita el 400 que tumba todo el lote).
+    existentes = existing_emails(candidatos, token, batch_size) if candidatos else set()
+    inputs = [i for i in inputs if i["id"].lower() in existentes]
+    no_encontrados = [e for e in candidatos if e.lower() not in existentes]
+
     summary = {
-        "total_a_actualizar": len(inputs),
-        "dry_run": dry_run,
+        "candidatos": len(candidatos),
+        "existen_en_hubspot": len(inputs),
+        "no_encontrados_en_hubspot": len(no_encontrados),
+        "muestra_no_encontrados": no_encontrados[:5],
         "validado_por": validado_por,
-        "muestra": inputs[:5],
+        "dry_run": dry_run,
         "lotes": (len(inputs) + batch_size - 1) // batch_size,
         "actualizados": 0,
         "errores": [],
@@ -168,7 +203,6 @@ def sync_statuses(df, token: str = None, owner: str = None,
     if dry_run or not inputs:
         return summary
 
-    token = get_token(token)
     ensure_properties(token)
     url = f"{BASE}/crm/v3/objects/contacts/batch/update"
     for i in range(0, len(inputs), batch_size):
