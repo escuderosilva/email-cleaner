@@ -72,13 +72,6 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
     return buf.getvalue()
 
 
-def read_upload(uploaded) -> pd.DataFrame:
-    name = uploaded.name.lower()
-    if name.endswith((".xlsx", ".xls")):
-        return pd.read_excel(uploaded, dtype=str)
-    return pd.read_csv(uploaded, dtype=str)
-
-
 def guess_email_column(columns) -> int:
     for i, c in enumerate(columns):
         if "email" in c.lower() or "correo" in c.lower() or "mail" in c.lower():
@@ -140,13 +133,25 @@ uploaded = st.file_uploader(
 
 if uploaded:
     try:
-        df = read_upload(uploaded)
+        uploaded.seek(0)
+        if uploaded.name.lower().endswith((".xlsx", ".xls")):
+            xls = pd.ExcelFile(uploaded)
+            if len(xls.sheet_names) > 1:
+                hoja = st.selectbox(
+                    "¿Qué hoja del Excel usar?", xls.sheet_names,
+                    help="El archivo tiene varias hojas; elige la que contiene los correos.",
+                )
+            else:
+                hoja = xls.sheet_names[0]
+            df = xls.parse(sheet_name=hoja, dtype=str)
+        else:
+            df = pd.read_csv(uploaded, dtype=str)
     except Exception as e:
         st.error(f"No pude leer el archivo. Revisa que sea un Excel o CSV válido. Detalle: {e}")
         st.stop()
 
     if df.empty:
-        st.warning("El archivo no tiene filas.")
+        st.warning("La hoja/el archivo no tiene filas.")
         st.stop()
 
     st.success(f"Archivo cargado: {len(df):,} filas.")
