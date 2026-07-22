@@ -1,0 +1,20 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - EMAIL_CLEANER_DATA_DIR=/data
+      - USAGE_SHEET_ID=${USAGE_SHEET_ID:-}
+      - HUBSPOT_TOKEN=${HUBSPOT_TOKEN:-}
+      - GCP_SERVICE_ACCOUNT_FILE=/secrets/sa.json
+    volumes:
+      # Datos persistentes (caché, historial, log). Sobrevive reinicios.
+      - cleaner-data:/data
+      # Credencial del service account (Google Sheet). Se monta como archivo,
+      # NO va en la imagen. Coloca el JSON en ./secrets/sa.json en el servidor.
+      - ./secrets/sa.json:/secrets/sa.json:ro
+    restart: unless-stopped
+
+volumes:
+  cleaner-data:

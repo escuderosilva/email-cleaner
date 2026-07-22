@@ -6,9 +6,10 @@ correo fue chequeado dentro de la ventana elegida, se reutiliza el resultado y
 no se gasta procesamiento (ni consultas DNS) en él.
 """
 import json
-from pathlib import Path
 
-HISTORY_PATH = Path(__file__).resolve().parent.parent / "data" / "check_history.json"
+from .paths import data_dir
+
+HISTORY_PATH = data_dir() / "check_history.json"
 
 FIELDS = ("last_check_date", "estado", "motivo", "tipo_dominio",
           "email_normalizado", "dominio", "correccion_typo")

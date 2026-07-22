@@ -8,10 +8,11 @@ from pathlib import Path
 import dns.resolver
 
 from .domains import FREE_DOMAINS
+from .paths import data_dir
 
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
-CACHE_PATH = Path(__file__).resolve().parent.parent / "data" / "mx_cache.json"
+CACHE_PATH = data_dir() / "mx_cache.json"
 CACHE_TTL_SECONDS = 30 * 24 * 3600  # 30 días
 
 

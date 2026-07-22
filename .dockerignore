@@ -1,10 +1,12 @@
 .venv/
+.git/
 __pycache__/
 *.pyc
 .env
-.streamlit/secrets.toml
+secrets/
 data/mx_cache.json
 data/check_history.json
 data/usage_log.csv
 .DS_Store
-secrets/
+*.tex
+*.pdf

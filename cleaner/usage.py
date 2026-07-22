@@ -13,9 +13,10 @@ import csv
 import json
 import os
 from datetime import datetime
-from pathlib import Path
 
-USAGE_LOG = Path(__file__).resolve().parent.parent / "data" / "usage_log.csv"
+from .paths import data_dir
+
+USAGE_LOG = data_dir() / "usage_log.csv"
 HEADER = ["timestamp", "email", "accion", "detalle"]
 
 # Dominios corporativos permitidos para usar la herramienta.
@@ -41,7 +42,16 @@ def _get_worksheet():
     _ws_init = True
 
     sheet_id = os.environ.get("USAGE_SHEET_ID")
+    # Credenciales: como string JSON (Streamlit Secrets) o como archivo montado
+    # (Docker/servidor, via GCP_SERVICE_ACCOUNT_FILE).
     creds_json = os.environ.get("GCP_SERVICE_ACCOUNT_JSON")
+    creds_file = os.environ.get("GCP_SERVICE_ACCOUNT_FILE")
+    if not creds_json and creds_file and os.path.exists(creds_file):
+        try:
+            with open(creds_file, encoding="utf-8") as f:
+                creds_json = f.read()
+        except OSError:
+            creds_json = None
     if not sheet_id or not creds_json:
         return None
     try:
