@@ -370,9 +370,10 @@ if "result" in st.session_state:
             "Tratar 'no verificable' como inválido (más estricto)", value=False,
             help="Por defecto queda en 'riesgo' para no descartar buenos contactos.",
         )
-        # Se verifica por TANDAS chicas y se guarda el avance en la sesión: si la
-        # página se recarga, no se pierde lo ya verificado y continúa donde iba.
-        CHUNK = 10
+        # Se verifica por TANDAS y se guarda el avance en la sesión: si la página
+        # se recarga, no se pierde lo ya verificado y continúa donde iba. Cada
+        # tanda agrupa dominios y reutiliza conexión, así que es rápida.
+        CHUNK = 25
         _keys = ("smtp_pending", "smtp_total", "smtp_sender", "smtp_strict")
 
         if st.session_state.get("smtp_pending"):
@@ -420,7 +421,10 @@ if "result" in st.session_state:
                     "Usa los filtros del Paso 2 para reducir la selección."
                 )
             else:
-                st.session_state["smtp_pending"] = list(target.index)
+                # Ordenar por dominio: agrupa correos del mismo dominio en la
+                # misma tanda para aprovechar la reutilización de conexión.
+                pend = sorted(target.index, key=lambda i: str(result.loc[i, "dominio"]))
+                st.session_state["smtp_pending"] = pend
                 st.session_state["smtp_total"] = len(target)
                 st.session_state["smtp_sender"] = sender
                 st.session_state["smtp_strict"] = estricto
