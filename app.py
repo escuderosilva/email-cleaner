@@ -365,9 +365,45 @@ if "result" in st.session_state:
             "Tratar 'no verificable' como inválido (más estricto)", value=False,
             help="Por defecto queda en 'riesgo' para no descartar buenos contactos.",
         )
-        if st.button("Verificar y actualizar la base"):
-            from cleaner.smtp_verify import verify_batch, MAX_ROWS
+        # Se verifica por TANDAS chicas y se guarda el avance en la sesión: si la
+        # página se recarga, no se pierde lo ya verificado y continúa donde iba.
+        CHUNK = 10
+        _keys = ("smtp_pending", "smtp_total", "smtp_sender", "smtp_strict")
+
+        if st.session_state.get("smtp_pending"):
+            from cleaner.smtp_verify import verify_batch
             from cleaner.pipeline import reconcile_smtp
+            pend = st.session_state["smtp_pending"]
+            total = st.session_state.get("smtp_total", len(pend))
+            hechos = total - len(pend)
+            st.info("Verificación SMTP en curso — no cierres la pestaña. El avance se guarda solo.")
+            st.progress(hechos / total if total else 1.0, text=f"Verificando: {hechos}/{total}")
+            if st.button("Cancelar verificación"):
+                for k in _keys:
+                    st.session_state.pop(k, None)
+                st.rerun()
+            chunk_idx = pend[:CHUNK]
+            emails_chunk = [result.loc[i, "email_normalizado"] for i in chunk_idx]
+            try:
+                res = verify_batch(emails_chunk, st.session_state["smtp_sender"])
+                st.session_state["result"] = reconcile_smtp(
+                    result, dict(zip(chunk_idx, res)),
+                    strict_unverifiable=st.session_state.get("smtp_strict", False),
+                )
+                st.session_state["smtp_pending"] = pend[CHUNK:]
+                if not st.session_state["smtp_pending"]:
+                    log_event(usuario, "smtp", f"{total} correos")
+                    for k in _keys:
+                        st.session_state.pop(k, None)
+                    st.success(f"Listo. Se verificaron {total} correos.")
+                st.rerun()
+            except Exception as e:
+                for k in _keys:
+                    st.session_state.pop(k, None)
+                st.error(f"Se detuvo la verificación: {e}")
+
+        elif st.button("Verificar y actualizar la base"):
+            from cleaner.smtp_verify import MAX_ROWS
             emails = target["email_normalizado"].tolist()
             if not sender or "@" not in sender:
                 st.error("Ingresa un correo remitente válido.")
@@ -379,18 +415,10 @@ if "result" in st.session_state:
                     "Usa los filtros del Paso 2 para reducir la selección."
                 )
             else:
-                sprog = st.progress(0.0, text="Verificando...")
-                res = verify_batch(
-                    emails, sender,
-                    progress_callback=lambda i, t: sprog.progress(i / t, text=f"Verificando {i}/{t}"),
-                )
-                sprog.empty()
-                smtp_by_index = dict(zip(target.index, res))
-                st.session_state["result"] = reconcile_smtp(
-                    result, smtp_by_index, strict_unverifiable=estricto
-                )
-                log_event(usuario, "smtp", f"{len(res):,} correos")
-                st.success(f"Listo. Se actualizaron {len(res):,} correos en la base.")
+                st.session_state["smtp_pending"] = list(target.index)
+                st.session_state["smtp_total"] = len(target)
+                st.session_state["smtp_sender"] = sender
+                st.session_state["smtp_strict"] = estricto
                 st.rerun()
 
     # ---- HubSpot (opcional) ----
